@@ -2,6 +2,8 @@
 
 int j = 0;
 char packet[]= {0x03, 0x04};
+volatile int col_holding, row_holding;
+volatile unsigned short pressed_key;
 
 void initI2C_master(){
      UCB1CTLW0 |= UCSWRST;       // SW RESET ON
@@ -61,66 +63,6 @@ int checkRow(int row_holding){
         return 0x00;
     }
 }
-void checkKeypad(){
-    int i,j;
-    for(i=0;i<50; i=i+1){
-        for(j=0;j<1911; j=j+1){}   // small delay for button input
-    }
-
-    columnInput();
-
-    int col_holding;
-    int row_holding;
-    int result;
-
-    col_holding = checkCol(P3IN);
-
-    rowInput();
-    row_holding = checkRow(P3IN);
-
-    // add R4 + R5
-    result = row_holding + col_holding;
-
-    // switch case
-    switch(result){
-        case 0x0087:
-            // 1
-            break;
-        case 0x0083:
-            // 2
-            break;
-        case 0x0081:
-            // 3
-            break;
-        case 0x0080:
-            //transmit("A");
-            break;
-        case 0x0047:
-            // 4
-            break;
-        case 0x0043:
-            // 5
-            break;
-        case 0x0041:
-            // 6
-            break;
-        case 0x0040:
-            // B
-            break;
-    }
-
-    for(i=0;i<1500; i=i+1){}   // small delay for button input
-
-}
-
-//void columnInputOld(){
-//    P3DIR &= ~(BIT0 | BIT1 | BIT2 | BIT3);  // Initialize pins as input
-//    P3REN |= (BIT0 | BIT1 | BIT2 | BIT3);  // Enable pull up/down resistor
-//    P3OUT &= ~(BIT0 | BIT1 | BIT2 | BIT3); // Configure resistors as pull down
-//
-//    P3DIR |= (BIT4 | BIT5 | BIT6 | BIT7);  // init pins as outputs
-//    P3OUT |= (BIT4 | BIT5 | BIT6 | BIT7);  // set as outputs
-//}
 
 void initTimerB0compare(){
     // setup TB0
@@ -154,6 +96,11 @@ void rowInput(){
 
     P3DIR |= (BIT0 | BIT1 | BIT2 | BIT3);  // init pins as outputs
     P3OUT |= (BIT0 | BIT1 | BIT2 | BIT3);  // set as outputs
+
+    //P3IES &= ~(BIT4 | BIT5 | BIT6 | BIT7); // L-H edge sensitivity
+    //P3IE |= (BIT4 | BIT5 | BIT6 | BIT7); // enable IRQs
+
+    //P3IFG &= ~(BIT4 | BIT5 | BIT6 | BIT7); // Clear the P3 interrupt flags
 }
 
 int main(void)
@@ -170,44 +117,62 @@ int main(void)
     __enable_interrupt();
 
     int i;
-    while(1){
-//        UCB1CTLW0 |= UCTXSTT;   // generate START condition
-//        P6OUT |= BIT6; //  LED ON
-//        for(i=0;i<20500; i=i+1){}   // delay
-//        P6OUT &= ~BIT6; //  LED ON
-
-        //checkKeypad(); // polling method - not working
-
-    }
+    while(1){}
 
     return 0;
 }
 
 #pragma vector=PORT3_VECTOR
 __interrupt void ISR_PORT3(void){
-
     /* enable timer for debouncing */
     TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
     TB0CCR0 = 2384;         // set CCR0 value (period)
     TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag to begin count
 }
 
+void I2Ctransmit(int slave_command) {
+    packet[0] = slave_command;
+    UCB1CTLW0 |= UCTXSTT;   // generate START condition
+}
+
+void keyPressedAction(int pressed_key) {
+    switch(pressed_key) {
+        case 0x0180: // A
+                I2Ctransmit(0x03);
+            break;
+        case 0x0140: // B
+                I2Ctransmit(0x04);
+            break;
+        case 0x0120: // C
+                I2Ctransmit(0x05);
+            break;
+        case 0x0110: // D
+                I2Ctransmit(0x06);
+            break;
+    }
+    columnInput();
+}
+
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
     P6OUT ^= BIT6;
-    UCB1CTLW0 |= UCTXSTT;   // generate START condition
+
+    col_holding = P3IN;
+
+    rowInput();
+
+    row_holding = P3IN;
+    pressed_key = col_holding + row_holding;
+
+    keyPressedAction(pressed_key);
+
     P3IFG &= ~(BIT0 | BIT1 | BIT2 | BIT3); // Clear the P3 interrupt flags
-    TB0CCTL0 &= ~CCIE;
+    TB0CCTL0 &= ~CCIE;  // Disable TimerB0
 }
 
 #pragma vector=EUSCI_B1_VECTOR
 __interrupt void EUSCI_B1_TX_ISR(void){
     UCB1TXBUF = packet[0];
-    if(packet[0] == 0x03){
-        packet[0] = 0x04;
-    } else {
-        packet[0] = 0x03;
-    }
 }
 
 //#pragma vector=EUSCI_B1_VECTOR
