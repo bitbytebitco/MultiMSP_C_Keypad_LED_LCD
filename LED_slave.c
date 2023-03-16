@@ -1,7 +1,10 @@
 #include <msp430.h> 
 
 int Rx_Command;
+volatile int seq_count;
+volatile int rotating_count;
 volatile int bin_count;
+volatile int timer_action_select;
 
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;       // SW RESET enabled
@@ -65,24 +68,54 @@ void PressA() {
     setLEDn(6);
 }
 
-void delay(){
-    int i,j,k;
-    for(i=0;i<20000; i=i+1){
-        for(j=0;j<20000; j=j+1){
-            for(k=0;k<20000; k=k+1){}
-        }
-    }
+void rotatingCounter(int count) {
+    ResetLED();
+    setLEDn(count);
 }
 
-void IncrementBinaryCounter(int bin_count){
+void incrementBinaryCounter(int count) {
     int k,n;
     n = 1;
     ResetLED();
     for(k=0;k<8;k++){
-        if((bin_count & n)>0){
+        if((count & n)>0){
             setLEDn(k);
         }
         n = n << 1;
+    }
+}
+
+void sequenceCounter(int count) {
+    ResetLED();
+    switch(count){
+        case 1:
+            setLEDn(3);
+            setLEDn(4);
+            break;
+        case 2:
+            setLEDn(2);
+            setLEDn(5);
+            break;
+        case 3:
+            setLEDn(1);
+            setLEDn(6);
+            break;
+        case 4:
+            setLEDn(0);
+            setLEDn(7);
+            break;
+        case 5:
+            setLEDn(1);
+            setLEDn(6);
+            break;
+        case 6:
+            setLEDn(2);
+            setLEDn(5);
+            break;
+        case 7:
+            setLEDn(3);
+            setLEDn(4);
+            break;
     }
 }
 
@@ -91,14 +124,21 @@ void initTimerB0compare(){
     TB0CTL |= TBCLR;        // Clear TB0
     TB0CTL |= TBSSEL__ACLK; // select SMCLK
     TB0CTL |= MC__UP;       // UP mode
-    TB0CCR0 = 16384;         // set CCR0 value (period)
 
+    TB0CCR0 = 16384;         // set CCR0 value (period)
     TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
     TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag
 }
 
 void disableTimerB0Compare(){
-    TB0CCTL0 &= ~CCIE;       // disable IRQ enable for CCR0
+    TB0CCTL0 &= ~CCIE;  // Disable TimerB0
+}
+
+void enableTImerB0Compare(){
+    TB0CTL |= TBCLR;        // Clear TB0
+    TB0CCR0 = 16384;         // set CCR0 value (period)
+    TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
+    TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag
 }
 
 void init(){
@@ -111,6 +151,9 @@ void init(){
     P2DIR |= (BIT6 | BIT7);
     P2OUT &= ~(BIT6 | BIT7);
 
+    bin_count = 0;
+    timer_action_select= 0 ;
+
     initI2C_slave();
     initTimerB0compare();
 
@@ -121,40 +164,54 @@ int main(void)
 {
     init();
 
-    int i;
-    bin_count=0;
-    while(1){
-//        PressA();
-//        delay();
-//        ResetLED();
-//        delay();
-
-    }
+    while(1){}
 
     return 0;
 }
 
-//
+void executeCommand(int command){
+    if(Rx_Command == 0x03){
+        timer_action_select = 0;
+        ResetLED();
+        PressA();
+    } else if(Rx_Command == 0x04){
+        timer_action_select = 1; // select binary counter
+    } else if(Rx_Command == 0x05){
+        timer_action_select = 2; // select rotating counter
+    } else if(Rx_Command == 0x06){
+        timer_action_select = 3; // select alternating counter
+    }
+}
+
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
     Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-    ResetLED();
-    disableTimerB0Compare();
-
-    if(Rx_Command == 0x03){
-        PressA();
-    } else if(Rx_Command == 0x04){
-        TB0CCTL0 |= CCIE; // enable binary counting interrupt routine
-    }
-    UCB0IFG &= ~UCTXIFG0;   // clear flag
+    executeCommand(Rx_Command);
+    UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
 }
 
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
-    IncrementBinaryCounter(bin_count++);
-    if(bin_count==255){
-        bin_count = 0;
+    if(timer_action_select == 1){
+        incrementBinaryCounter(bin_count);
+        bin_count++;
+        if(bin_count>=255){
+            bin_count = 0;
+        }
+    } else if(timer_action_select == 2) {
+        rotatingCounter(rotating_count);
+        rotating_count++;
+        if(rotating_count == 8){
+            rotating_count = 0;
+        }
+    } else if(timer_action_select == 3) {
+        sequenceCounter(seq_count);
+        seq_count++;
+        if(seq_count == 8) {
+            seq_count = 0;
+        }
     }
+
     TB0CCTL0 &= ~CCIFG;
 }
 
