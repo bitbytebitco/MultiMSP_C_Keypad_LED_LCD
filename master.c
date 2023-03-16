@@ -36,34 +36,6 @@ void initI2C_master(){
      UCB1IE |= UCTXIE0;          // enable I2C B0 Tx IRQ
 }
 
-int checkCol(int col_holding){
-    if((BIT0 & col_holding)>0){
-        return 0x00F1;
-    } else if((BIT1 & col_holding)>0){
-        return 0x00F2;
-    } else if((BIT2 & col_holding)>0){
-        return 0x00F4;
-    } else if((BIT3 & col_holding)>0){
-        return 0x00F8;
-    } else {
-        return 0x00;
-    }
-}
-
-int checkRow(int row_holding){
-    if((BIT4 & row_holding)>0){
-        return 0x001F;
-    } else if((BIT5 & row_holding)>0){
-        return 0x002F;
-    } else if((BIT6 & row_holding)>0){
-        return 0x004F;
-    } else if((BIT7 & row_holding)>0){
-        return 0x008F;
-    } else {
-        return 0x00;
-    }
-}
-
 void initTimerB0compare(){
     // setup TB0
     TB0CTL |= TBCLR;        // Clear TB0
