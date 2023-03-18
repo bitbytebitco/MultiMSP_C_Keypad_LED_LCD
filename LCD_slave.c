@@ -63,17 +63,6 @@ void delay1000(){
     for(i=0;i<=1000;i++){}
 }
 
-void delay1000old(){
-    ms_flag = 0;
-    ms_count = 0;
-    ms_thresh = 1;
-    TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
-    while(ms_flag != 1){}
-    TB0CCTL0 &= ~CCIE;       // disable CCR0
-}
-
-
-
 void configure(){
     P2OUT &= ~BIT7; // clear RS
     P1OUT |= (BIT4 | BIT5); // set P1.4-5
@@ -91,8 +80,6 @@ void latch(){
     delay1000();
     P2OUT &= ~BIT6; // reset E bit (LCD)
 }
-
-
 
 void delay_ms(int ms){
     P1OUT |= BIT1; // LED on
@@ -176,6 +163,59 @@ void clear_display(){
     delay_ms(10);
 }
 
+void setNibbleBit(int n) {
+    switch(n){
+        case 3:
+            P1OUT |= BIT7;
+            break;
+        case 2:
+            P1OUT |= BIT6;
+            break;
+        case 1:
+            P1OUT |= BIT5;
+            break;
+        case 0:
+            P1OUT |= BIT4;
+            break;
+    }
+}
+
+void clearNibbleBit(int n) {
+    switch(n){
+        case 3:
+            P1OUT &= ~BIT7;
+            break;
+        case 2:
+            P1OUT &= ~BIT6;
+            break;
+        case 1:
+            P1OUT &= ~BIT5;
+            break;
+        case 0:
+            P1OUT &= ~BIT4;
+            break;
+    }
+}
+
+void sendNibble(unsigned short byte) {
+    int k,n;
+    volatile int test;
+    n = 1;
+
+    for(k=0;k<=3;k++){
+        test = byte & n;
+        if(test>0){
+            setNibbleBit(k);
+        } else {
+            clearNibbleBit(k);
+        }
+        n = n << 1;
+    }
+    P2OUT |= BIT7; // set RS
+    latch();
+    delay_ms(10);
+}
+
 int main(void)
 {
     init();
@@ -184,29 +224,29 @@ int main(void)
 
     clear_display();
 
-    P2OUT |= BIT7; // set RS
-    P1OUT |= (BIT6); // upper nibble
-    P1OUT &= ~(BIT7 | BIT5 | BIT4 );
-    latch();
-    delay_ms(10);
-
-    P2OUT |= BIT7; // set RS
-    P1OUT &= ~(BIT7 | BIT6); // lower nibble
-    P1OUT |= (BIT5 | BIT4);
-    latch();
-    delay_ms(10);
+    // Character "C"
+    sendNibble(0b00000100);
+    sendNibble(0b00000011);
 
     while(1){ }
 
     return 0;
 }
 
-void executeCommand(int command){}
+
+void displayChar(short command){
+    switch(command){
+        case 0x00:
+            sendNibble(0b00000011);
+            sendNibble(0b00000000);
+            break;
+    }
+}
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
     Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-    executeCommand(Rx_Command);
+    displayChar(Rx_Command);
     UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
 }
 
