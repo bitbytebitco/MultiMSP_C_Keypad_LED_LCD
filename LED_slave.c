@@ -9,7 +9,7 @@ volatile int timer_action_select;
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;       // SW RESET enabled
     UCB0CTLW0 |= UCMODE_3 | UCSYNC;      // Put into I2C mode
-    UCB0I2COA0 = 0x0068 | UCOAEN; // Set slave address + enable
+    UCB0I2COA0 = 0x0058 | UCOAEN; // Set slave address + enable
 
     // setup ports
     P1SEL1 &= ~BIT3;            // P1.3 SCL
@@ -203,4 +203,3 @@ __interrupt void ISR_TB0_CCR0(void){
 
     TB0CCTL0 &= ~CCIFG;
 }
-
