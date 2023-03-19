@@ -2,8 +2,8 @@
 
 int j = 0;
 char packet[]= {0x03, 0x04};
-volatile int col_holding, row_holding;
-volatile unsigned short pressed_key;
+volatile unsigned char col_holding, row_holding;
+volatile unsigned char pressed_key;
 
 void initI2C_master(){
      UCB1CTLW0 |= UCSWRST;       // SW RESET ON
@@ -14,7 +14,7 @@ void initI2C_master(){
      UCB1CTLW0 |= UCMODE_3;      // Put into I2C mode
      UCB1CTLW0 |= UCMST;         // set as MASTER
      UCB1CTLW0 |= UCTR;          // Put into Tx mode
-     UCB1I2CSA = 0x0068;          // Slave address = 0x68
+     //UCB1I2CSA = 0x0068;          // Slave address = 0x68
 
      UCB1CTLW1 |= UCASTP_2;      // enable automatic stop bit
      //UCB1TBCNT = sizeof(packet);  // Transfer byte count
@@ -33,7 +33,7 @@ void initI2C_master(){
      PM5CTL0 &= ~LOCKLPM5;       // turn on I/O
      UCB1CTLW0 &= ~UCSWRST;      // SW RESET OFF
 
-     UCB1IE |= UCTXIE0;          // enable I2C B0 Tx IRQ
+     //UCB1IE |= UCTXIE0;          // enable I2C B0 Tx IRQ
 }
 
 void initTimerB0compare(){
@@ -89,7 +89,20 @@ int main(void)
     __enable_interrupt();
 
     int i;
-    while(1){}
+    while(1){
+        UCB1I2CSA = 0x0068;     // Slave address = 0x58
+        UCB1CTLW0 |= UCTXSTT;   // generate START condition
+        while((UCB1IFG & UCSTPIFG)==0);
+        UCB1IFG &= ~UCSTPIFG;
+
+        UCB1I2CSA = 0x0058;     // Slave address = 0x68
+        UCB1CTLW0 |= UCTXSTT;   // generate START condition
+        while((UCB1IFG & UCSTPIFG)==0);
+        UCB1IFG &= ~UCSTPIFG;
+
+        UCB1IE &= ~UCTXIE0;
+        for(i=0;i<=1000;i++){}
+    }
 
     return 0;
 }
@@ -98,30 +111,19 @@ int main(void)
 __interrupt void ISR_PORT3(void){
     /* enable timer for debouncing */
     TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
-    TB0CCR0 = 2384;         // set CCR0 value (period)
+    TB0CCR0 = 1000;         // set CCR0 value (period) // old value = 2384
     TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag to begin count
 }
 
 void I2Ctransmit(int slave_command) {
     packet[0] = slave_command;
-    UCB1CTLW0 |= UCTXSTT;   // generate START condition
+    //UCB1CTLW0 |= UCTXSTT;   // generate START condition
 }
 
-void keyPressedAction(int pressed_key) {
-    switch(pressed_key) {
-        case 0x0180: // A
-                I2Ctransmit(0x03);
-            break;
-        case 0x0140: // B
-                I2Ctransmit(0x04);
-            break;
-        case 0x0120: // C
-                I2Ctransmit(0x05);
-            break;
-        case 0x0110: // D
-                I2Ctransmit(0x06);
-            break;
-    }
+void keyPressedAction(char pressed_key) {
+    packet[0] = pressed_key;
+    UCB1IE |= UCTXIE0;
+
     columnInput();
 }
 
