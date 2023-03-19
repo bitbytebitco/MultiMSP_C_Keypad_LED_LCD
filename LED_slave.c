@@ -130,17 +130,6 @@ void initTimerB0compare(){
     TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag
 }
 
-void disableTimerB0Compare(){
-    TB0CCTL0 &= ~CCIE;  // Disable TimerB0
-}
-
-void enableTImerB0Compare(){
-    TB0CTL |= TBCLR;        // Clear TB0
-    TB0CCR0 = 16384;         // set CCR0 value (period)
-    TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
-    TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag
-}
-
 void init(){
     WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
 
@@ -170,15 +159,15 @@ int main(void)
 }
 
 void executeCommand(int command){
-    if(Rx_Command == 0x03){
+    if(Rx_Command == 0x80){
         timer_action_select = 0;
         ResetLED();
         PressA();
-    } else if(Rx_Command == 0x04){
+    } else if(Rx_Command == 0x40){
         timer_action_select = 1; // select binary counter
-    } else if(Rx_Command == 0x05){
+    } else if(Rx_Command == 0x20){
         timer_action_select = 2; // select rotating counter
-    } else if(Rx_Command == 0x06){
+    } else if(Rx_Command == 0x10){
         timer_action_select = 3; // select alternating counter
     }
 }
