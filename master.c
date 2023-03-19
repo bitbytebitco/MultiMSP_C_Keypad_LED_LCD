@@ -26,9 +26,14 @@ void initI2C_master(){
 
      P4SEL1 &= ~BIT7;            // P4.7 SCL
      P4SEL0 |= BIT7;
+//     P4REN |= BIT7;
+//     P4OUT |= BIT7;
+
 
      P4SEL1 &= ~BIT6;            // P4.6 SDA
      P4SEL0 |= BIT6;
+//     P4REN |= BIT6;
+//     P4OUT |= BIT6;
 
      PM5CTL0 &= ~LOCKLPM5;       // turn on I/O
      UCB1CTLW0 &= ~UCSWRST;      // SW RESET OFF
@@ -90,7 +95,7 @@ int main(void)
 
     int i;
     while(1){
-        UCB1I2CSA = 0x0058;     // Slave address = 0x58
+        UCB1I2CSA = 0x0068;     // Slave address = 0x58
         UCB1CTLW0 |= UCTXSTT;   // generate START condition
         while((UCB1IFG & UCSTPIFG)==0);
         UCB1IFG &= ~UCSTPIFG;
@@ -125,10 +130,13 @@ void keyPressedAction(char pressed_key) {
     UCB1IE |= UCTXIE0;
 
     columnInput();
+    P3IFG &= ~(BIT0 | BIT1 | BIT2 | BIT3); // Clear the P3 interrupt flags
 }
 
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
+
+    TB0CCTL0 &= ~CCIE;  // Disable TimerB0
     P6OUT ^= BIT6;
 
     col_holding = P3IN;
@@ -140,8 +148,6 @@ __interrupt void ISR_TB0_CCR0(void){
 
     keyPressedAction(pressed_key);
 
-    P3IFG &= ~(BIT0 | BIT1 | BIT2 | BIT3); // Clear the P3 interrupt flags
-    TB0CCTL0 &= ~CCIE;  // Disable TimerB0
 }
 
 #pragma vector=EUSCI_B1_VECTOR
