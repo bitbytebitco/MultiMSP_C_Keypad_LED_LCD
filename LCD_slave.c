@@ -1,6 +1,6 @@
 #include <msp430.h> 
 
-int Rx_Command = 0;
+volatile int Rx_Command = 0;
 
 volatile int timer_action_select;
 volatile int ms_thresh, ms_count, ms_flag;
@@ -50,10 +50,11 @@ void init(){
     P2DIR |= BIT6;  // set P2.6 output for E (LCD), data starts on falling edge
     P2OUT &= ~BIT6; // clear P2.6
 
-    P1DIR |= BIT1;  // P1.1 LED output
-    P1OUT &= ~BIT1; // clear P1.1
+    P2DIR |= BIT0;  // P1.1 LED output
+    P2OUT &= ~BIT0; // clear P1.1
 
     initTimerB0compare();
+    initTimerB1compare();
     initI2C_slave();
 
     __enable_interrupt();
@@ -83,7 +84,7 @@ void latch(){
 }
 
 void delay_ms(int ms){
-    P1OUT |= BIT1; // LED on
+    P2OUT |= BIT0; // LED on
     ms_flag = 0;
     ms_count = 0;
     ms_thresh = ms;
@@ -91,7 +92,7 @@ void delay_ms(int ms){
     while(ms_flag != 1){}
     TB0CCTL0 &= ~CCIE;       // disable CCR0
     //flag_30_ms = 0;
-    P1OUT &= ~BIT1; // LED off
+    P2OUT &= ~BIT0; // LED off
 }
 
 
@@ -115,41 +116,38 @@ void LCDsetup() {
 
 
     // funcset interface 4 bit
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT &= ~(BIT7 | BIT6 | BIT4);
-    P1OUT |= (BIT5);
-    latch();
-    delay_ms(10);
+//    P2OUT &= ~BIT7; // clear RS
+//    P1OUT &= ~(BIT7 | BIT6 | BIT4);
+//    P1OUT |= (BIT5);
+//    latch();
+//    delay_ms(10);
+
+    sendByte(0b00101100, 0); // function set interface 4-bit & spec display lines and fonts
+
+    sendByte(0b00001000, 0); // display off
+
+    sendByte(0b00000001, 0); // clear display
 
     // spec display lines and fonts
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT |= (BIT6);
-    P1OUT &= ~(BIT7 | BIT5 | BIT4);
-    latch();
-    delay_ms(10);
+//    P2OUT &= ~BIT7; // clear RS
+//    P1OUT |= (BIT6);
+//    P1OUT &= ~(BIT7 | BIT5 | BIT4);
+//    latch();
+//    delay_ms(10);
 
     // display on/off
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT &= ~(BIT7 | BIT6 | BIT5 | BIT4);
-    latch();
-    delay_ms(10);
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT |= (BIT7 | BIT6 );
-    P1OUT &= ~(BIT5 | BIT4);
+//    P2OUT &= ~BIT7; // clear RS
+//    P1OUT &= ~(BIT7 | BIT6 | BIT5 | BIT4);
+//    latch();
+//    delay_ms(10);
+//    P2OUT &= ~BIT7; // clear RS
+//    P1OUT |= (BIT7 | BIT6 );
+//    P1OUT &= ~(BIT5 | BIT4);
+//
+//    latch();
+//    delay_ms(30);
 
-    latch();
-    delay_ms(30);
-
-    //
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT &= ~(BIT7 | BIT6 | BIT5 | BIT4);
-    latch();
-    delay_ms(10);
-    P2OUT &= ~BIT7; // clear RS
-    P1OUT |= (BIT6 | BIT5);
-    P1OUT &= ~(BIT7 | BIT4);
-    latch();
-    delay_ms(10);
+    sendByte(0b00000110, 0); // entry mode set
 
 }
 
@@ -198,7 +196,13 @@ void clearNibbleBit(int n) {
     }
 }
 
-void sendNibble(unsigned short byte) {
+void sendNibble(unsigned short byte, int rs) {
+    if(rs == 1){
+        P2OUT |= BIT7; // set RS
+    } else {
+        P2OUT &= ~BIT7; // set RS
+    }
+
     int k,n;
     volatile int test;
     n = 1;
@@ -212,57 +216,80 @@ void sendNibble(unsigned short byte) {
         }
         n = n << 1;
     }
-    P2OUT |= BIT7; // set RS
     latch();
     delay_ms(10);
 }
 
-int main(void)
-{
-    init();
-    delay_ms(20);
-    LCDsetup();
+void sendByte(int char_code, int rs){
+    sendNibble(char_code >> 4, rs);
+    sendNibble(char_code, rs);
+}
 
-    //clear_display();
+void incr_index_reg_right(){
+    sendByte(0b00010100, 0);
 
-    int i;
-    while(1){
-        for(i=0;i<=1000;i++){}
-        if(Rx_Command != 0){
-            clear_display();
-            executeCommand(Rx_Command);
-            Rx_Command = 0;
-        }
-    }
-
-    return 0;
 }
 
 void executeCommand(int command){
     switch(command){
         case 0x80:
             // Character "C" as a test
-                displayChar(0b01000001);
+                sendByte(0b01000001, 1);
             break;
         case 0x40:
             // Character "C" as a test
-                displayChar(0b01000010);
+                sendByte(0b01000010, 1);
             break;
     }
 }
 
-void displayChar(int char_code){
-    sendNibble(char_code >> 4);
-    sendNibble(char_code);
-    //sendNibble(0b00000100);
-    //sendNibble(0b00000011);
+void initTimerB1compare(){
+    // setup TB0
+    TB1CTL |= TBCLR;        // Clear TB0
+    TB1CTL |= TBSSEL__ACLK; // select SMCLK
+    TB1CTL |= MC__UP;       // UP mode
+    TB1CCTL0 |= CCIE;       // local IRQ enable for CCR0
+
+    //TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag
 }
+
+
+int main(void)
+{
+    init();
+    //P1OUT ^= BIT1; // clear P1.1
+    //delay_ms(20);
+//    LCDsetup();
+//
+//    sendByte(0b00001111, 0); // display on
+//
+//    sendByte(0b01000001, 1);
+//    delay_ms(1);
+//    sendByte(0b01000001, 1);
+//    delay_ms(1);
+//    sendByte(0b01000001, 1);
+//    delay_ms(1);
+//    sendByte(0b01000001, 1);
+
+    while(1){}
+
+    return 0;
+}
+
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
     Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-    //displayChar(Rx_Command);
-    UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
+
+//    P2OUT ^= BIT0; // clear P1.1
+//    if(Rx_Command == 0x80){
+        TB1CCTL0 |= CCIE;       // local IRQ enable for CCR0
+        TB1CCR0 = 2000;         // set CCR0 value (period)
+        TB1CCTL0 &= ~CCIFG;     // clear CCR0 flag to begin count
+//    }
+
+
+//    UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
 }
 
 #pragma vector=TIMER0_B0_VECTOR
@@ -274,5 +301,16 @@ __interrupt void ISR_TB0_CCR0(void){
     }
 
     TB0CCTL0 &= ~CCIFG;
+}
+
+#pragma vector=TIMER1_B0_VECTOR
+__interrupt void ISR_TB1_CCR0(void){
+    //executeCommand(Rx_Command);
+
+    P2OUT ^= BIT0; // clear P1.1
+    TB1CCTL0 &= ~CCIE; // disable timer
+    TB1CCTL0 |= CCIFG;
+
+    UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
 }
 
