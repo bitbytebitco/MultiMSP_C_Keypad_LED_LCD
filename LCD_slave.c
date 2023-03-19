@@ -1,9 +1,10 @@
 #include <msp430.h> 
 
-int Rx_Command;
+int Rx_Command = 0;
 
 volatile int timer_action_select;
 volatile int ms_thresh, ms_count, ms_flag;
+//char rx_packet = {0x00};
 
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;       // SW RESET enabled
@@ -160,7 +161,7 @@ void clear_display(){
     P1OUT &= ~(BIT7 | BIT6 | BIT5 );
     P1OUT |= BIT4;
     latch();
-    delay_ms(10);
+    delay_ms(2);
 }
 
 void setNibbleBit(int n) {
@@ -222,31 +223,45 @@ int main(void)
     delay_ms(20);
     LCDsetup();
 
-    clear_display();
+    //clear_display();
 
-    // Character "C"
-    sendNibble(0b00000100);
-    sendNibble(0b00000011);
-
-    while(1){ }
+    int i;
+    while(1){
+        for(i=0;i<=1000;i++){}
+        if(Rx_Command != 0){
+            clear_display();
+            executeCommand(Rx_Command);
+            Rx_Command = 0;
+        }
+    }
 
     return 0;
 }
 
-
-void displayChar(short command){
+void executeCommand(int command){
     switch(command){
-        case 0x00:
-            sendNibble(0b00000011);
-            sendNibble(0b00000000);
+        case 0x80:
+            // Character "C" as a test
+                displayChar(0b01000001);
+            break;
+        case 0x40:
+            // Character "C" as a test
+                displayChar(0b01000010);
             break;
     }
+}
+
+void displayChar(int char_code){
+    sendNibble(char_code >> 4);
+    sendNibble(char_code);
+    //sendNibble(0b00000100);
+    //sendNibble(0b00000011);
 }
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
     Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-    displayChar(Rx_Command);
+    //displayChar(Rx_Command);
     UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
 }
 
