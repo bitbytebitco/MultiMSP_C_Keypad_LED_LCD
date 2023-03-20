@@ -96,14 +96,7 @@ void delay_ms(int ms){
 
 
 void clear_display(){
-    P2OUT &= ~BIT7; // set RS
-    P1OUT &= ~(BIT7 | BIT6 | BIT5 | BIT4);
-    latch();
-    delay_ms(2);
-    P1OUT &= ~(BIT7 | BIT6 | BIT5 );
-    P1OUT |= BIT4;
-    latch();
-    delay_ms(2);
+    sendByte(0b00000001, 0);
 }
 
 void setNibbleBit(int n) {
@@ -202,20 +195,58 @@ void LCDsetup() {
 }
 
 int getCharCode(){
+    int ret;
     switch(Rx_Command){
         case 0x80: // A
-            return 0b01000001;
+            ret = 0b01000001;
             break;
         case 0x40: // B
-            return 0b01000010;
+            ret =  0b01000010;
             break;
         case 0x20: // C
-            return 0b01000011;
+            ret =  0b01000011;
             break;
         case 0x10: // D
-            return 0b01000100;
+            ret =  0b01000100;
+            break;
+        case 0x87: // 1
+            ret =  0b00110001;
+            break;
+        case 0x83: // 2
+            ret =  0b00110010;
+            break;
+        case 0x81: // 3
+            ret =  0b00110011;
+            break;
+        case 0x47: // 4
+            ret =  0b00110100;
+            break;
+        case 0x43: // 5
+            ret =  0b00110101;
+            break;
+        case 0x41: // 6
+            ret =  0b00110110;
+            break;
+        case 0x27: // 7
+            ret =  0b00110111;
+            break;
+        case 0x23: // 8
+            ret =  0b00111000;
+            break;
+        case 0x21: // 9
+            ret =  0b00111001;
+            break;
+        case 0x17: // *
+            ret =  0b00101010;
+            break;
+        case 0x13: // 0
+            ret =  0b00110000;
+            break;
+        case 0x11: // #
+            ret =  -1;
             break;
     }
+    return ret;
 }
 
 int main(void)
@@ -230,8 +261,12 @@ int main(void)
     while(1){
         if(action_select == 1){
             int code = getCharCode();
-            sendByte(code, 1); // display character
-            action_select = 0;
+            if(code == -1){
+                clear_display();
+            } else if(code != 0){
+                sendByte(code, 1); // display character
+                action_select = 0;
+            }
         }
     }
 
