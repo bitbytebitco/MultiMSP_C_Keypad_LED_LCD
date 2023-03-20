@@ -201,6 +201,23 @@ void LCDsetup() {
 
 }
 
+int getCharCode(){
+    switch(Rx_Command){
+        case 0x80: // A
+            return 0b01000001;
+            break;
+        case 0x40: // B
+            return 0b01000010;
+            break;
+        case 0x20: // C
+            return 0b01000011;
+            break;
+        case 0x10: // D
+            return 0b01000100;
+            break;
+    }
+}
+
 int main(void)
 {
     init();
@@ -210,11 +227,10 @@ int main(void)
     sendByte(0b00001111, 0); // display on
     clear_display();
 
-//    sendByte(0b01000001, 1); // "A"
-
     while(1){
         if(action_select == 1){
-            sendByte(0b01000001, 1); // "A"
+            int code = getCharCode();
+            sendByte(code, 1); // display character
             action_select = 0;
         }
     }
@@ -222,15 +238,14 @@ int main(void)
     return 0;
 }
 
-void executeCommand(int command){
-}
+
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
+
     switch(UCB0IV){
         case 0x16:  // receiving
                 Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-//                executeCommand(Rx_Command);
                 action_select = 1;
                 P1OUT ^= BIT1;
             break;
