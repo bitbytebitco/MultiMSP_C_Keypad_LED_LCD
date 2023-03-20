@@ -100,10 +100,10 @@ int main(void)
         while((UCB1IFG & UCSTPIFG)==0);
         UCB1IFG &= ~UCSTPIFG;
 
-//        UCB1I2CSA = 0x0068;     // Slave address = 0x68
-//        UCB1CTLW0 |= UCTXSTT;   // generate START condition
-//        while((UCB1IFG & UCSTPIFG)==0);
-//        UCB1IFG &= ~UCSTPIFG;
+        UCB1I2CSA = 0x0058;     // Slave address = 0x68
+        UCB1CTLW0 |= UCTXSTT;   // generate START condition
+        while((UCB1IFG & UCSTPIFG)==0);
+        UCB1IFG &= ~UCSTPIFG;
 
         UCB1IE &= ~UCTXIE0;
         for(i=0;i<=1000;i++){}
