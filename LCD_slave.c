@@ -81,15 +81,12 @@ void latch(){
 }
 
 void delay_ms(int ms){
-    P1OUT |= BIT1; // LED on
     ms_flag = 0;
     ms_count = 0;
     ms_thresh = ms;
     TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
     while(ms_flag != 1){}
     TB0CCTL0 &= ~CCIE;       // disable CCR0
-    //flag_30_ms = 0;
-    P1OUT &= ~BIT1; // LED off
 }
 
 
@@ -264,6 +261,9 @@ int main(void)
             if(code == -1){
                 clear_display();
             } else if(code != 0){
+                if(code == 0b00101010){
+                    P1OUT &= ~BIT1; // turn off LED
+                }
                 sendByte(code, 1); // display character
                 action_select = 0;
             }
@@ -273,16 +273,14 @@ int main(void)
     return 0;
 }
 
-
-
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
 
     switch(UCB0IV){
         case 0x16:  // receiving
+                P1OUT |= BIT1;
                 Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
                 action_select = 1;
-                P1OUT ^= BIT1;
             break;
         case 0x18:
             break;
