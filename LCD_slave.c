@@ -242,6 +242,9 @@ int getCharCode(){
         case 0x11: // #
             ret =  -1;
             break;
+        default:
+            ret = 0;
+            break;
     }
     return ret;
 }
@@ -262,14 +265,16 @@ int main(void)
             int code = getCharCode();
             if(code == -1){
                 clear_display();
+                charCount = 0;
             } else if(code != 0){
+                P1OUT |= BIT1; // Turn on LED
                 if(code == 0b00101010){
                     P1OUT &= ~BIT1; // turn off LED
                 }
                 sendByte(code, 1); // display character
                 action_select = 0;
                 charCount++;
-                if(charCount == 31){
+                if(charCount == 32){
                     clear_display();
                 } else if(charCount == 16){
                     setCursorSecondRow();
@@ -286,7 +291,6 @@ __interrupt void EUSCI_B0_TX_ISR(void){
 
     switch(UCB0IV){
         case 0x16:  // receiving
-                P1OUT |= BIT1;
                 Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
                 action_select = 1;
             break;
