@@ -164,11 +164,13 @@ int main(void)
 void executeCommand(int command){
     if(Rx_Command == 0x17){
         P2OUT &= ~BIT0; // LED alert off
+        TB0CCTL0 |= CCIFG;
         timer_action_select = 0;
         bin_count = 0;
         rotating_count = 0;
         seq_count = 0;
         ResetLED();
+        TB0CCTL0 &= ~CCIFG;
     } else {
         if(Rx_Command == 0x80){
             P2OUT |= BIT0; // LED alert on
