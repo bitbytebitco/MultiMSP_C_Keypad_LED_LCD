@@ -4,6 +4,7 @@ int j = 0;
 char packet[]= {0x03, 0x04};
 volatile unsigned char col_holding, row_holding;
 volatile unsigned char pressed_key;
+int lock_state = 1;
 
 void initI2C_master(){
      UCB1CTLW0 |= UCSWRST;       // SW RESET ON
@@ -21,19 +22,15 @@ void initI2C_master(){
      UCB1TBCNT = 1;  // Transfer byte count
 
      // setup ports
-     P6DIR |= BIT6;  // set P6.6 as OUTPUT
-     P6OUT &= ~BIT6; // clear P6.6
+     P6DIR |= (BIT6 | BIT5 | BIT4);  // set P6.6-4 as OUTPUT
+     P6OUT &= ~(BIT6 | BIT5 | BIT4); // clear P6.6-4
 
      P4SEL1 &= ~BIT7;            // P4.7 SCL
      P4SEL0 |= BIT7;
-//     P4REN |= BIT7;
-//     P4OUT |= BIT7;
 
 
      P4SEL1 &= ~BIT6;            // P4.6 SDA
      P4SEL0 |= BIT6;
-//     P4REN |= BIT6;
-//     P4OUT |= BIT6;
 
      PM5CTL0 &= ~LOCKLPM5;       // turn on I/O
      UCB1CTLW0 &= ~UCSWRST;      // SW RESET OFF
@@ -112,32 +109,80 @@ int main(void)
     return 0;
 }
 
-#pragma vector=PORT3_VECTOR
-__interrupt void ISR_PORT3(void){
-    /* enable timer for debouncing */
-    TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
-    TB0CCR0 = 1000;         // set CCR0 value (period) // old value = 2384
-    TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag to begin count
-}
+
 
 void I2Ctransmit(int slave_command) {
     packet[0] = slave_command;
     //UCB1CTLW0 |= UCTXSTT;   // generate START condition
 }
 
+void displayUnlockPattern(){
+    int i;
+    for(i=0;i<=20000;i++){}
+    P6OUT &= ~BIT4;
+    for(i=0;i<=30000;i++){}
+    P6OUT &= ~BIT5;
+    for(i=0;i<=30000;i++){}
+    P6OUT &= ~BIT6;
+    for(i=0;i<=30000;i++){}
+    P6OUT |= (BIT6 | BIT5 | BIT4);
+    for(i=0;i<=30000;i++){}
+    P6OUT &= ~(BIT6 | BIT5 | BIT4);
+    for(i=0;i<=30000;i++){}
+    P6OUT |= (BIT6 | BIT5 | BIT4);
+    for(i=0;i<=30000;i++){}
+    P6OUT &= ~(BIT6 | BIT5 | BIT4);
+}
+
+int is_unlocked(char key){
+    if(lock_state == 0){
+        return 1;
+    } else {
+        if(lock_state == 1){
+            if(key == 0x80){
+                P6OUT |= BIT6;
+                lock_state = 2;
+            }
+        } else if(lock_state == 2){
+            if(key == 0x40){
+                P6OUT |= BIT5;
+                lock_state = 3;
+            }
+        } else if(lock_state == 3){
+            if(key == 0x20){
+                P6OUT |= BIT4;
+                displayUnlockPattern();
+                lock_state = 0;
+            }
+        }
+        return 0;
+    }
+}
+
 void keyPressedAction(char pressed_key) {
-    packet[0] = pressed_key;
-    UCB1IE |= UCTXIE0;
+    if(is_unlocked(pressed_key) == 1){
+        packet[0] = pressed_key;
+        UCB1IE |= UCTXIE0;
+    }
 
     columnInput();
     P3IFG &= ~(BIT0 | BIT1 | BIT2 | BIT3); // Clear the P3 interrupt flags
+
+}
+
+#pragma vector=PORT3_VECTOR
+__interrupt void ISR_PORT3(void){
+    /* enable timer for debouncing */
+    TB0CCTL0 |= CCIE;       // local IRQ enable for CCR0
+    TB0CCR0 = 500;         // set CCR0 value (period) // old value = 2384
+    TB0CCTL0 &= ~CCIFG;     // clear CCR0 flag to begin count
 }
 
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
 
     TB0CCTL0 &= ~CCIE;  // Disable TimerB0
-    P6OUT ^= BIT6;
+//    P6OUT ^= BIT6;
 
     col_holding = P3IN;
 
@@ -154,14 +199,3 @@ __interrupt void ISR_TB0_CCR0(void){
 __interrupt void EUSCI_B1_TX_ISR(void){
     UCB1TXBUF = packet[0];
 }
-
-//#pragma vector=EUSCI_B1_VECTOR
-//__interrupt void EUSCI_B1_TX_ISR(void){
-//    if (j == (sizeof(packet)-1)){
-//        UCB1TXBUF = packet[j];
-//        j = 0;
-//    } else {
-//        UCB1TXBUF = packet[j];
-//        j++;
-//    }
-//}
