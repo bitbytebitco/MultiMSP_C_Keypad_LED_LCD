@@ -10,7 +10,7 @@ void initI2C_master(){
      UCB1CTLW0 |= UCSWRST;       // SW RESET ON
 
      UCB1CTLW0 |= UCSSEL_3;      // SMCLK
-     UCB1BRW = 1;               // prescalar to 10
+     UCB1BRW = 10;               // prescalar to 10
 
      UCB1CTLW0 |= UCMODE_3;      // Put into I2C mode
      UCB1CTLW0 |= UCMST;         // set as MASTER
