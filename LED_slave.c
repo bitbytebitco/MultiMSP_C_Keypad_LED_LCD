@@ -140,6 +140,9 @@ void init(){
     P2DIR |= (BIT6 | BIT7);
     P2OUT &= ~(BIT6 | BIT7);
 
+    P2DIR |= BIT0; // P2.0 LED output
+    P2OUT &= ~BIT0; // P2.0 off
+
     bin_count = 0;
     timer_action_select= 0 ;
 
@@ -159,16 +162,29 @@ int main(void)
 }
 
 void executeCommand(int command){
-    if(Rx_Command == 0x80){
+    if(Rx_Command == 0x17){
+        P2OUT &= ~BIT0; // LED alert off
         timer_action_select = 0;
+        bin_count = 0;
+        rotating_count = 0;
+        seq_count = 0;
         ResetLED();
-        PressA();
-    } else if(Rx_Command == 0x40){
-        timer_action_select = 1; // select binary counter
-    } else if(Rx_Command == 0x20){
-        timer_action_select = 2; // select rotating counter
-    } else if(Rx_Command == 0x10){
-        timer_action_select = 3; // select alternating counter
+    } else {
+        if(Rx_Command == 0x80){
+            P2OUT |= BIT0; // LED alert on
+            timer_action_select = 0;
+            ResetLED();
+            PressA();
+        } else if(Rx_Command == 0x40){
+            P2OUT |= BIT0; // LED alert on
+            timer_action_select = 1; // select binary counter
+        } else if(Rx_Command == 0x20){
+            P2OUT |= BIT0; // LED alert on
+            timer_action_select = 2; // select rotating counter
+        } else if(Rx_Command == 0x10){
+            P2OUT |= BIT0; // LED alert on
+            timer_action_select = 3; // select alternating counter
+        }
     }
 }
 
