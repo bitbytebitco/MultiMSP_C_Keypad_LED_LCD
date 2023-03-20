@@ -1,3 +1,4 @@
+
 #include <msp430.h> 
 
 int Rx_Command = 0;
@@ -163,19 +164,18 @@ void incr_index_reg_right(){
     sendByte(0b00010100, 0);
 }
 
+void setCursorSecondRow(){
+    sendByte(0b10101000, 0);
+}
+
 void LCDsetup() {
 
-    configure();
-    latch();
-    delay_ms(10);
-
-    configure();
-    latch();
-    delay_ms(10);
-
-    configure();
-    latch();
-    delay_ms(10);
+    int i;
+    for(i=0;i<=2;i++){
+        configure();
+        latch();
+        delay_ms(10);
+    }
 
     configure2(); // funcset interface 4 bit
     latch();
@@ -183,7 +183,7 @@ void LCDsetup() {
 
     sendByte(0b00101100, 0); // function set interface 4-bit & spec display lines and fonts
 
-    sendByte(0b00001000, 0); // display off
+    sendByte(0b00001111, 0); // display on
 
     sendByte(0b00000001, 0); // clear display
 
@@ -248,11 +248,13 @@ int getCharCode(){
 
 int main(void)
 {
+    int charCount = 0;
+
     init();
     delay_ms(20);
     LCDsetup();
 
-    sendByte(0b00001111, 0); // display on
+//    sendByte(0b00001111, 0); // display on
     clear_display();
 
     while(1){
@@ -266,6 +268,12 @@ int main(void)
                 }
                 sendByte(code, 1); // display character
                 action_select = 0;
+                charCount++;
+                if(charCount == 31){
+                    clear_display();
+                } else if(charCount == 16){
+                    setCursorSecondRow();
+                }
             }
         }
     }
