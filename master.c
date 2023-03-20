@@ -103,7 +103,7 @@ int main(void)
         UCB1IFG &= ~UCSTPIFG;
 
         UCB1IE &= ~UCTXIE0;
-        for(i=0;i<=1000;i++){}
+        for(i=0;i<=3000;i++){}
     }
 
     return 0;
