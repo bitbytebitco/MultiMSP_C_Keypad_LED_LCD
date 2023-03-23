@@ -103,17 +103,10 @@ int main(void)
         UCB1IFG &= ~UCSTPIFG;
 
         UCB1IE &= ~UCTXIE0;
-        for(i=0;i<=3000;i++){}
+        for(i=0;i<=5000;i++){}
     }
 
     return 0;
-}
-
-
-
-void I2Ctransmit(int slave_command) {
-    packet[0] = slave_command;
-    //UCB1CTLW0 |= UCTXSTT;   // generate START condition
 }
 
 void displayUnlockPattern(){
@@ -182,7 +175,6 @@ __interrupt void ISR_PORT3(void){
 __interrupt void ISR_TB0_CCR0(void){
 
     TB0CCTL0 &= ~CCIE;  // Disable TimerB0
-//    P6OUT ^= BIT6;
 
     col_holding = P3IN;
 
