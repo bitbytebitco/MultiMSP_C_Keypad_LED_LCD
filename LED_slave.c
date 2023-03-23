@@ -3,7 +3,9 @@
 int Rx_Command;
 volatile int seq_count;
 volatile int rotating_count;
-volatile int bin_count;
+volatile int bin_count = 0;
+volatile int bin_reset = 0;
+volatile int star_reset = 0;
 volatile int timer_action_select;
 
 void initI2C_slave(){
@@ -166,9 +168,9 @@ void executeCommand(int command){
         P2OUT &= ~BIT0; // LED alert off
         TB0CCTL0 |= CCIFG;
         timer_action_select = 0;
-        bin_count = 0;
-        rotating_count = 0;
-        seq_count = 0;
+        rotating_count = 0; // reset rotation counter
+        seq_count = 0; // reset alternating sequence counter
+        star_reset = 1;
         ResetLED();
         TB0CCTL0 &= ~CCIFG;
     } else {
@@ -179,7 +181,16 @@ void executeCommand(int command){
             PressA();
         } else if(Rx_Command == 0x40){
             P2OUT |= BIT0; // LED alert on
+            //TB0CCTL0 |= CCIFG;
+            timer_action_select = 0;
+            bin_reset = 1;
+            if(star_reset == 1){
+                bin_reset = 0;
+                star_reset = 0;
+            }
+            ResetLED();
             timer_action_select = 1; // select binary counter
+            //TB0CCTL0 &= ~CCIFG;
         } else if(Rx_Command == 0x20){
             P2OUT |= BIT0; // LED alert on
             timer_action_select = 2; // select rotating counter
@@ -192,14 +203,22 @@ void executeCommand(int command){
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
-    Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
-    executeCommand(Rx_Command);
-    UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
+    switch(UCB0IV){
+        case 0x16:  // receiving
+            Rx_Command = UCB0RXBUF;    // Retrieve byte from buffer
+            executeCommand(Rx_Command);
+            UCB0IFG &= ~UCTXIFG0;   // clear flag to allow I2C interrupt
+            break;
+    }
 }
 
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
     if(timer_action_select == 1){
+        if(bin_reset == 1){
+            bin_count = 0;
+            bin_reset = 0;
+        }
         incrementBinaryCounter(bin_count);
         bin_count++;
         if(bin_count>=255){
